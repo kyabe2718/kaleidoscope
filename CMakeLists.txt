@@ -11,7 +11,7 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 add_library(llvm INTERFACE)
 target_include_directories(llvm INTERFACE ${LLVM_INCLUDE_DIRS})
 target_compile_definitions(llvm INTERFACE ${LLVM_DEFINITIONS})
-llvm_map_components_to_libnames(llvm-libs support core irreader codegen)
+llvm_map_components_to_libnames(llvm-libs support core irreader codegen orcerror orcjit native nativecodegen)
 target_link_libraries(llvm INTERFACE ${llvm-libs})
 
 
@@ -34,3 +34,6 @@ target_link_libraries(test_parse libkaleidoscope)
 
 add_executable(test_cogen EXCLUDE_FROM_ALL test/cogen.cpp)
 target_link_libraries(test_cogen libkaleidoscope)
+
+add_executable(test_jit EXCLUDE_FROM_ALL test/jit.cpp)
+target_link_libraries(test_jit libkaleidoscope)

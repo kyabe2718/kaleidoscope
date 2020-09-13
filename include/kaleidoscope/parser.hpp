@@ -8,32 +8,37 @@
 #include "lex.hpp"
 #include "ast.hpp"
 
-namespace kaleidoscope {
+namespace kaleidoscope
+{
 
 struct ParserImpl;
 
-struct Parser {
-    explicit Parser(Tokenizer &&tok);
+struct Parser
+{
+    explicit Parser(Tokenizer&& tok);
 
     bool parse();
 
-    void setDefHandler(std::function<void(const FunctionAST &)> handler) {
+    void setDefHandler(std::function<void(std::unique_ptr<FunctionAST>)> handler)
+    {
         def_handler = std::move(handler);
     }
 
-    void setExternHandler(std::function<void(const PrototypeAST &)> handler) {
+    void setExternHandler(std::function<void(std::unique_ptr<PrototypeAST>)> handler)
+    {
         extern_handler = std::move(handler);
     }
 
-    void setTopLevelHandler(std::function<void(const FunctionAST &)> handler) {
+    void setTopLevelHandler(std::function<void(std::unique_ptr<FunctionAST>)> handler)
+    {
         toplevel_handler = std::move(handler);
     }
 
 private:
     // Tokenizer tokenizer;
     std::shared_ptr<ParserImpl> impl;
-    std::function<void(const FunctionAST &)> def_handler;
-    std::function<void(const PrototypeAST &)> extern_handler;
-    std::function<void(const FunctionAST &)> toplevel_handler;
+    std::function<void(std::unique_ptr<FunctionAST>)> def_handler;
+    std::function<void(std::unique_ptr<PrototypeAST>)> extern_handler;
+    std::function<void(std::unique_ptr<FunctionAST>)> toplevel_handler;
 };
-}
+}  // namespace kaleidoscope

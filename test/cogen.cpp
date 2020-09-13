@@ -1,50 +1,59 @@
 #include <kaleidoscope/parser.hpp>
 
-#include <llvm/Support/raw_ostream.h>
+#include <fstream>
+#include <iostream>
+#include <memory>
 
 using namespace kaleidoscope;
 
-int main() {
-    Parser parser{Tokenizer{std::cin}};
+int main(int argc, char** argv)
+{
+
+    bool is_finput = (argc > 1);
+
+    auto parser = [&] {
+        if (is_finput) {
+            return Parser{Tokenizer{argv[1]}};
+        } else {
+            return Parser{Tokenizer{std::cin}};
+        }
+    }();
 
     CodeGenEnv env{"my cool jit"};
 
-    parser.setDefHandler([&](const FunctionAST &def) {
-        std::cerr << "parsed a function definition" << std::endl;
+    parser.setDefHandler([&](const FunctionAST& def) {
         if (auto code = def.codegen(env)) {
-            code->print(llvm::errs());
-            llvm::errs() << '\n';
-            llvm::errs().flush();
+            llvm::outs() << "; parsed a function definition\n";
+            llvm::outs() << *code << '\n';
         } else {
-            std::cerr << "failed to cogen" << std::endl;
+            std::cerr << "[function def] failed to cogen" << std::endl;
         }
     });
 
-    parser.setExternHandler([&](const PrototypeAST &ext) {
-        std::cerr << "parsed an external" << std::endl;
+    parser.setExternHandler([&](const PrototypeAST& ext) {
         if (auto code = ext.codegen(env)) {
-            code->print(llvm::errs());
-            llvm::errs() << '\n';
-            llvm::errs().flush();
+            llvm::outs() << "; parsed an external\n";
+            llvm::outs() << *code << '\n';
         } else {
-            std::cerr << "failed to cogen" << std::endl;
+            std::cerr << "[external] failed to cogen" << std::endl;
         }
     });
 
-    parser.setTopLevelHandler([&](const FunctionAST &top) {
-        std::cerr << "parsed a top level expression" << std::endl;
+    parser.setTopLevelHandler([&](const FunctionAST& top) {
         if (auto code = top.codegen(env)) {
-            code->print(llvm::errs());
-            llvm::errs() << '\n';
-            llvm::errs().flush();
+            llvm::outs() << "; parsed a top level expression\n";
+            llvm::outs() << *code << '\n';
         } else {
-            std::cerr << "failed to cogen" << std::endl;
+            std::cerr << "[top level] failed to cogen" << std::endl;
         }
     });
 
-    std::cout << "ready> ";
-    while (parser.parse()) {
-        std::cout << std::endl << "ready> ";
+    if (is_finput) {
+        while (parser.parse())
+            ;
+    } else {
+        std::cout << "ready> ";
+        while (parser.parse())
+            std::cout << "\nready> ";
     }
-
 }

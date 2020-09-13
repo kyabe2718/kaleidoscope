@@ -8,45 +8,52 @@
 
 #include <iostream>
 
-namespace kaleidoscope {
+namespace kaleidoscope
+{
 
-template<class... Msg>
-llvm::Value *logErrorV(Msg &&... msg) {
-    ((std::cerr << "LogErrorV: ") << ... << msg);
+template <class... Msg>
+llvm::Value* logErrorV(Msg&&... msg)
+{
+    ((std::cerr << "LogErrorV: ") << ... << msg) << std::endl;
     return nullptr;
 }
 
-template<class... Msg>
-llvm::Function *logErrorF(Msg &&... msg) {
-    ((std::cerr << "LogFunctionV: ") << ... << msg);
+template <class... Msg>
+llvm::Function* logErrorF(Msg&&... msg)
+{
+    ((std::cerr << "LogFunctionV: ") << ... << msg) << std::endl;
+    ;
     return nullptr;
 }
 
-llvm::Value *NumberExpAST::codegen(CodeGenEnv &env) const {
+llvm::Value* NumberExpAST::codegen(CodeGenEnv& env)
+{
     return llvm::ConstantFP::get(env.context, llvm::APFloat(val));
 }
 
-llvm::Value *VariableExprAST::codegen(CodeGenEnv &env) const {
+llvm::Value* VariableExprAST::codegen(CodeGenEnv& env)
+{
     auto v = env.named_value[name];
     if (!v)
         return logErrorV("unknown variable name: ", name);
     return v;
 }
 
-llvm::Value *BinaryExprAST::codegen(CodeGenEnv &env) const {
+llvm::Value* BinaryExprAST::codegen(CodeGenEnv& env)
+{
     auto l = lhs->codegen(env);
     auto r = rhs->codegen(env);
     if (!l || !r)
         return nullptr;
 
     if (op == "+") {
-        return env.builder.CreateFAdd(l, r, "addtmp"); // addtmpは単なる名付けのヒント
+        return env.builder.CreateFAdd(l, r, "addtmp");  // addtmpは単なる名付けのヒント
     } else if (op == "-") {
         return env.builder.CreateFSub(l, r, "subtmp");
     } else if (op == "*") {
         return env.builder.CreateFMul(l, r, "multmp");
     } else if (op == "<") {
-        auto ret = env.builder.CreateFCmpULT(l, r, "ulttmp"); // unordered less than. unordered: quiet_nanが入りうる
+        auto ret = env.builder.CreateFCmpULT(l, r, "ulttmp");  // unordered less than. unordered: quiet_nanが入りうる
         // bool -> double
         return env.builder.CreateUIToFP(ret, llvm::Type::getDoubleTy(env.context), "booltmp");
     } else if (op == ">") {
@@ -58,25 +65,29 @@ llvm::Value *BinaryExprAST::codegen(CodeGenEnv &env) const {
     }
 }
 
-llvm::Value *CallExprAST::codegen(CodeGenEnv &env) const {
-    auto func = env.module->getFunction(callee);
+llvm::Value* CallExprAST::codegen(CodeGenEnv& env)
+{
+    //    auto func = env.module->getFunction(callee);
+    auto func = env.getFunction(callee);  // module内に，proto type宣言しかなくてもよい
+
     if (!func)
         return logErrorV("unknown function referenced: ", callee);
 
     if (func->arg_size() != args.size())
         return logErrorV("argument mismatch: ", callee);
 
-    std::vector<llvm::Value *> arg_values;
-    for (auto &arg : args) {
+    std::vector<llvm::Value*> arg_values;
+    for (auto& arg : args) {
         arg_values.push_back(arg->codegen(env));
     }
 
     return env.builder.CreateCall(func, arg_values, "calltmp");
 }
 
-llvm::Function *PrototypeAST::codegen(CodeGenEnv &env) const {
+llvm::Function* PrototypeAST::codegen(CodeGenEnv& env)
+{
     // 型は全てdouble
-    std::vector<llvm::Type *> doubles(args.size(), llvm::Type::getDoubleTy(env.context));
+    std::vector<llvm::Type*> doubles(args.size(), llvm::Type::getDoubleTy(env.context));
 
     // create function type
     auto func_type = llvm::FunctionType::get(llvm::Type::getDoubleTy(env.context), doubles, false);
@@ -87,15 +98,21 @@ llvm::Function *PrototypeAST::codegen(CodeGenEnv &env) const {
     // This phase isn't strictly necessary
     // keep the name consistent to make IR readable
     size_t id = 0;
-    for (auto &farg: func->args()) {
+    for (auto& farg : func->args()) {
         farg.setName(args.at(id++));
     }
 
     return func;
 }
 
-llvm::Function *FunctionAST::codegen(CodeGenEnv &env) const {
-    auto func = env.module->getFunction(proto->getName());
+llvm::Function* FunctionAST::codegen(CodeGenEnv& env)
+{
+    std::unique_ptr<PrototypeAST> p = nullptr;
+    proto.swap(p);
+    auto name = p->getName();
+    auto& proto = env.proto_func.insert_or_assign(name, std::move(p)).first->second;
+
+    auto func = env.getFunction(name);
 
     if (!func)
         func = proto->codegen(env);
@@ -113,16 +130,17 @@ llvm::Function *FunctionAST::codegen(CodeGenEnv &env) const {
 
     // 変数のマッピングを更新
     env.named_value.clear();
-    for (auto &arg: func->args())
+    for (auto& arg : func->args())
         env.named_value[arg.getName()] = &arg;
 
     if (auto retval = body->codegen(env)) {
-        env.builder.CreateRet(retval); // finish off the function
+        env.builder.CreateRet(retval);  // finish off the function
         llvm::verifyFunction(*func);
+        env.FPM->run(*func);
         return func;
     } else {
         func->eraseFromParent();
         return nullptr;
     }
 }
-}
+}  // namespace kaleidoscope

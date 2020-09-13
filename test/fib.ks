@@ -1,18 +1,19 @@
 
 def fib(x)
-    if x < 3 then
-        1
-    else
-        fib(x - 1) + fib(x - 2)
+    fib(x - 1) + fib(x - 2)
+;
 
-# fib(40);
+def test(x)
+    (1 + x + 2) * (2 + x + 1)
+;
 
+def test2(x)
+    (1 + 2 + x) * (x + (1 + 2))
+;
+
+test(40);
 
 # extern sin(arg);
 # extern cos(arg);
 # extern atan2(arg1, arg2);
-#
-# atan2(sin(.4), cos(42));
-
-# hogehoge
 
